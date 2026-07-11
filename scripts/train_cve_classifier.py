@@ -99,11 +99,53 @@ def download_nvd(year, out_dir):
 
 
 def load_nvd_data(data_dir):
-    """Load NVD CVE data and extract (description, label) pairs."""
+    """Load NVD CVE data and extract (description, label) pairs.
+    
+    Tries local pre-packaged file first, falls back to download.
+    """
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
 
+    # Try local pre-packaged file (from CNScan)
+    local_file = data_dir / "nvd_data_compact.json"
+    if not local_file.exists():
+        # Also check repo root
+        local_file = Path(__file__).parent.parent / "nvd_data_compact.json"
+    if not local_file.exists():
+        # Check /opt/vnc-training-repo
+        local_file = Path("/opt/vnc-training-repo/nvd_data_compact.json")
+
     samples = []
+
+    if local_file.exists():
+        console.print(f"[green]Loading pre-packaged NVD data from {local_file}...[/green]")
+        with open(local_file) as f:
+            raw = json.load(f)
+        for item in raw:
+            desc_text = item.get("d", "")
+            cwes = item.get("c", [])
+            if not desc_text or len(desc_text) < 20:
+                continue
+
+            # Determine label
+            label = "other"
+            for cwe in cwes:
+                if cwe in CWE_TO_TYPE:
+                    label = CWE_TO_TYPE[cwe]
+                    break
+            if label == "other":
+                desc_lower = desc_text.lower()
+                for vuln_type, keywords in KEYWORD_MAP.items():
+                    if any(kw in desc_lower for kw in keywords):
+                        label = vuln_type
+                        break
+
+            samples.append({"cve_id": "", "description": desc_text, "label": label, "cwes": cwes})
+        console.print(f"[green]Loaded {len(samples)} CVE samples from local file[/green]")
+        return samples
+
+    # Fall back to downloading
+    console.print("[yellow]No local NVD data found, downloading...[/yellow]")
     current_year = time.localtime().tm_year
 
     for year in range(current_year - 4, current_year + 1):
@@ -128,7 +170,6 @@ def load_nvd_data(data_dir):
             if not desc_text or len(desc_text) < 20:
                 continue
 
-            # Extract CWEs
             cwes = []
             for problem in item.get("cve", {}).get("problemtype", {}).get("problemtype_data", []):
                 for desc in problem.get("description", []):
@@ -136,14 +177,11 @@ def load_nvd_data(data_dir):
                     if cwe.startswith("CWE-"):
                         cwes.append(cwe)
 
-            # Determine label
             label = "other"
-            # Try CWE mapping first
             for cwe in cwes:
                 if cwe in CWE_TO_TYPE:
                     label = CWE_TO_TYPE[cwe]
                     break
-            # Fall back to keyword matching
             if label == "other":
                 desc_lower = desc_text.lower()
                 for vuln_type, keywords in KEYWORD_MAP.items():
