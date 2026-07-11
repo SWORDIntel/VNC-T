@@ -1,0 +1,74 @@
+#cloud-config
+users:
+  - name: john
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtCAa2bsj2jENXmtoGUuqIcM50P4UTO5qSdO5jRYily nvidia-nebious-cloud
+
+write_files:
+  - path: /opt/vnc-setup.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      exec > >(tee /var/log/vnc-setup.log) 2>&1
+      log() { echo "[VNC-SETUP] $(date -Iseconds) $*"; }
+      REPO_URL="https://github.com/SWORDIntel/VNC-T.git"
+      CLONE_DIR="/opt/vnc-training-repo"
+      VENV="/opt/vnc-training"
+      log "Starting setup on $(hostname)"
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -q
+      apt-get install -y -q python3.12 python3.12-venv python3.12-dev python3-pip build-essential cmake pkg-config libopencv-dev libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev git curl wget tmux htop nvtop unzip nodejs npm
+      PYTHON="python3.12"
+      $PYTHON --version
+      $PYTHON -m venv "$VENV" || (rm -rf "$VENV" && $PYTHON -m venv "$VENV")
+      source "$VENV/bin/activate"
+      pip install --upgrade pip wheel setuptools
+      pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126 || { pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 || pip install torch torchvision; }
+      pip install opencv-python-headless pillow numpy rich tqdm openvino onnx onnxscript
+      npm install -g @openai/codex || true
+      curl -LsSf https://astral.sh/uv/install.sh | sh || true
+      export PATH="$HOME/.cargo/bin:$PATH"
+      uvx google-agents-cli setup --skip-auth || (pip install google-agents-cli || true)
+      pip install google-antigravity || true
+      python3 -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none')" || true
+      if [ ! -d "$CLONE_DIR/.git" ]; then git clone "$REPO_URL" "$CLONE_DIR"; else (cd "$CLONE_DIR" && git pull); fi
+      chmod +x "$CLONE_DIR/scripts/setup.sh" "$CLONE_DIR/scripts/run.sh" "$CLONE_DIR/scripts/train_vnc_tui.py" "$CLONE_DIR/scripts/augment_dataset.py" || true
+      log "Setup complete."
+
+  - path: /opt/vnc-run.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      exec > >(tee /var/log/vnc-run.log) 2>&1
+      log() { echo "[VNC-RUN] $(date -Iseconds) $*"; }
+      REPO_URL="https://github.com/SWORDIntel/VNC-T.git"
+      CLONE_DIR="/opt/vnc-training-repo"
+      DATA_DIR="$CLONE_DIR/dataset"
+      VENV="/opt/vnc-training"
+      RELEASE_URL="https://github.com/SWORDIntel/VNC-T/releases/download/v1.0/dataset.tar.gz"
+      cd "$CLONE_DIR" || { git clone "$REPO_URL" "$CLONE_DIR"; cd "$CLONE_DIR"; }
+      git pull || true
+      DATASET_ARCHIVE="/tmp/dataset.tar.gz"
+      if [ ! -f "$DATASET_ARCHIVE" ]; then
+        log "Downloading dataset..."
+        wget -q --show-progress "$RELEASE_URL" -O "$DATASET_ARCHIVE" || curl -L --progress-bar "$RELEASE_URL" -o "$DATASET_ARCHIVE" || { log "Dataset download failed"; exit 1; }
+      fi
+      rm -rf "$DATA_DIR"
+      mkdir -p "$DATA_DIR"
+      tar xzf "$DATASET_ARCHIVE" -C "$DATA_DIR"
+      rm -f "$DATASET_ARCHIVE"
+      CLASSES=$(find "$DATA_DIR" -maxdepth 1 -mindepth 1 -type d | wc -l)
+      IMAGES=$(find "$DATA_DIR" -type f | wc -l)
+      log "Dataset: $CLASSES classes, $IMAGES images"
+      source "$VENV/bin/activate"
+      if tmux has-session -t train 2>/dev/null; then tmux kill-session -t train; fi
+      tmux new-session -d -s train "cd '$CLONE_DIR' && source '$VENV/bin/activate' && python3 scripts/train_vnc_tui.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models' --epochs 50 --batch-size 256 --backbone mobilenetv2 --resume 2>&1 | tee /tmp/train.log"
+      log "Training started. Attach with: tmux attach -t train"
+
+runcmd:
+  - bash /opt/vnc-setup.sh
+  - bash /opt/vnc-run.sh
