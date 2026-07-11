@@ -13,37 +13,49 @@ tmux attach -t train
 
 Training will auto-start via cloud-init. The TUI shows live progress, per-class accuracy, GPU memory, and best validation accuracy.
 
-## CLI Launcher
+## TUI Launcher
 
-`launch.sh` in the repo root creates the VM via Nebius CLI, waits for SSH, and drops into a live progress monitor.
+`launch.py` in the repo root creates the VM via Nebius CLI, pre-seeds the repo via rsync, and drops into a live rich TUI dashboard.
 
 ```bash
-# Full: create VM + wait + monitor
+# Full: create VM + pre-seed + TUI monitor
 export PROJECT_ID=proj-xxx
 export PLATFORM=<platform>          # nebius compute platform list
 export PRESET=<preset>              # nebius compute preset list
 export SUBNET_ID=<subnet-id>        # nebius vpc subnet list
-./launch.sh
+python3 launch.py
 
-# Just monitor an existing VM
-./launch.sh --monitor
+# Just monitor an existing VM (TUI dashboard)
+python3 launch.py --monitor
+
+# Pre-seed repo to VM (rsync + start pipeline)
+python3 launch.py --seed
 
 # Check VM status + pipeline state
-./launch.sh --status
+python3 launch.py --status
 
 # SSH in directly
-./launch.sh --ssh
+python3 launch.py --ssh
 
 # Stop / start / delete
-./launch.sh --stop
-./launch.sh --start
-./launch.sh --delete
+python3 launch.py --stop
+python3 launch.py --start
+python3 launch.py --delete
 ```
 
-The progress monitor shows pipeline state (✅/🔄/⏳ per model), GPU utilization, tmux session status, and recent log output — refreshing every 5 seconds. Ctrl+C exits the monitor (VM keeps running).
+**Pre-seeding**: On first connection, `launch.py` rsyncs the repo to the VM, checks if the venv exists (from cloud-init setup), and starts the pipeline if it's not already running. This ensures the latest code is on the VM immediately — no waiting for git clone inside cloud-init.
+
+**TUI dashboard** shows (refreshes every 5s):
+- Pipeline state per model (✅ done / 🔄 running / ⏳ pending) with progress bars
+- GPU utilization, memory, temperature
+- tmux session status
+- System uptime + disk usage
+- Recent training log output (last 10 lines)
+- Ctrl+C exits the dashboard — VM keeps training
 
 ## Files
 
+- `launch.py` — TUI launcher: create VM, pre-seed repo, live dashboard
 - `scripts/train_vnc_tui.py` — Main VNC screenshot classifier (MobileNetV2, Rich TUI, AMP, checkpointing, ONNX/OpenVINO export)
 - `scripts/train_alarm_detector.py` — Alarm state detector (normal/warning/alarm/critical, pseudo-labeled from color heuristics)
 - `scripts/train_os_classifier.py` — OS/platform classifier (Windows/Linux/embedded/server/kiosk, MobileNetV3)
