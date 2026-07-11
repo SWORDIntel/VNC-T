@@ -24,26 +24,48 @@ import sys
 import time
 from pathlib import Path
 
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.layout import Layout
-    from rich.live import Live
-    from rich.text import Text
-    from rich.align import Align
-    from rich import box
-except ImportError:
-    print("Installing rich...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "rich"])
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.layout import Layout
-    from rich.live import Live
-    from rich.text import Text
-    from rich.align import Align
-    from rich import box
+# --- Local venv bootstrap ---
+# launch.py runs on the user's laptop — it needs `rich` for the TUI.
+# Create a lightweight local venv so we don't pollute system Python.
+LAUNCHER_VENV = Path(__file__).resolve().parent / ".venv-launcher"
+
+def _ensure_venv():
+    """Ensure a local venv with rich exists. Re-exec into it if needed."""
+    needs_rich = False
+    try:
+        import rich  # noqa: F401
+        return  # already in a venv with rich, or system has it
+    except ImportError:
+        needs_rich = True
+
+    if needs_rich:
+        if not LAUNCHER_VENV.exists():
+            print(f"Creating launcher venv at {LAUNCHER_VENV} ...")
+            subprocess.check_call([sys.executable, "-m", "venv", str(LAUNCHER_VENV)])
+            subprocess.check_call([str(LAUNCHER_VENV / "bin" / "pip"), "install", "--upgrade", "pip", "wheel"])
+
+        # Check if rich is installed in the launcher venv
+        r = subprocess.run(
+            [str(LAUNCHER_VENV / "bin" / "python"), "-c", "import rich"],
+            capture_output=True,
+        )
+        if r.returncode != 0:
+            print("Installing rich into launcher venv ...")
+            subprocess.check_call([str(LAUNCHER_VENV / "bin" / "pip"), "install", "rich"])
+
+        # Re-exec ourselves using the launcher venv's python
+        os.execv(str(LAUNCHER_VENV / "bin" / "python"), [str(LAUNCHER_VENV / "bin" / "python"), __file__] + sys.argv[1:])
+
+_ensure_venv()
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.layout import Layout
+from rich.live import Live
+from rich.text import Text
+from rich.align import Align
+from rich import box
 
 console = Console()
 
