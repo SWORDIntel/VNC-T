@@ -46,7 +46,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 
 # 6. Core Python deps
 log "Installing Python dependencies..."
-pip install opencv-python-headless pillow numpy rich tqdm openvino onnx onnxscript
+pip install opencv-python-headless pillow numpy rich tqdm openvino onnx onnxscript matplotlib seaborn scikit-learn
 
 # 7. Dev tools — OpenAI Codex CLI (non-fatal)
 log "Installing OpenAI Codex CLI..."

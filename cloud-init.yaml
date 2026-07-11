@@ -27,7 +27,7 @@ write_files:
       source "$VENV/bin/activate"
       pip install --upgrade pip wheel setuptools
       pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126 || { pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 || pip install torch torchvision; }
-      pip install opencv-python-headless pillow numpy rich tqdm openvino onnx onnxscript
+      pip install opencv-python-headless pillow numpy rich tqdm openvino onnx onnxscript matplotlib seaborn scikit-learn
       npm install -g @openai/codex || true
       curl -LsSf https://astral.sh/uv/install.sh | sh || true
       export PATH="$HOME/.cargo/bin:$PATH"

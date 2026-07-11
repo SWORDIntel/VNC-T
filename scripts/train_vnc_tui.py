@@ -396,6 +396,9 @@ def train(args):
 
     context = live.__enter__() if live else None
 
+    # Training curves for report
+    curves = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
+
     try:
         for epoch in range(start_epoch, args.epochs):
             state = "training"
@@ -508,6 +511,14 @@ def train(args):
                 context["footer"]["per_class"].update(Panel(per_class, title="Per-Class Accuracy"))
                 context["footer"]["logs"].update(Panel(log_panel, title="Recent Logs"))
 
+            # Record curves
+            curves["train_loss"].append(avg_train_loss)
+            curves["val_loss"].append(avg_val_loss)
+            curves["train_acc"].append(train_acc)
+            curves["val_acc"].append(val_acc)
+            with open(output_dir / "training_curves.json", "w") as f:
+                json.dump(curves, f)
+
             console.print(f"Epoch {epoch+1}: train_loss={avg_train_loss:.4f} train_acc={train_acc:.2f}% val_loss={avg_val_loss:.4f} val_acc={val_acc:.2f}% best={best_val_acc:.2f}%")
 
             # Early stopping
@@ -552,6 +563,21 @@ def train(args):
 
         console.print(f"\n[green]Best val acc: {best_val_acc:.2f}% at epoch {best_epoch}[/green]")
         console.print(f"[green]Models saved in: {output_dir}[/green]")
+
+        # Auto-generate fancy report
+        console.print("[cyan]Generating evaluation report...[/cyan]")
+        try:
+            import subprocess
+            subprocess.run([
+                sys.executable, str(Path(__file__).parent / "generate_report.py"),
+                "--data-dir", str(data_path),
+                "--output-dir", str(output_dir),
+                "--report-dir", str(output_dir.parent / "reports"),
+                "--batch-size", str(batch_size),
+                "--img-size", str(args.img_size),
+            ], check=False)
+        except Exception as re:
+            console.print(f"[yellow]Report generation failed: {re}[/yellow]")
 
     except Exception as e:
         if live:
