@@ -15,10 +15,14 @@ Training will auto-start via cloud-init. The TUI shows live progress, per-class 
 
 ## Files
 
-- `scripts/train_vnc_tui.py` — Training with Rich TUI, AMP, checkpointing, OOM fallback, and ONNX/OpenVINO export
+- `scripts/train_vnc_tui.py` — Main VNC screenshot classifier (MobileNetV2, Rich TUI, AMP, checkpointing, ONNX/OpenVINO export)
+- `scripts/train_alarm_detector.py` — Alarm state detector (normal/warning/alarm/critical, pseudo-labeled from color heuristics)
+- `scripts/train_os_classifier.py` — OS/platform classifier (Windows/Linux/embedded/server/kiosk, MobileNetV3)
+- `scripts/train_anomaly_ae.py` — Anomaly autoencoder (unsupervised, ConvAE, reconstruction error = anomaly score)
+- `scripts/generate_report.py` — Fancy HTML report with benchmarks, confusion matrix, training curves, sample predictions
 - `scripts/augment_dataset.py` — Smart OpenCV augmentation using visual heuristics
 - `scripts/setup.sh` — Installs PyTorch/CUDA, dev tools (Codex CLI, Google agents-cli, Antigravity SDK)
-- `scripts/run.sh` — Downloads dataset, starts training in tmux
+- `scripts/run.sh` — Downloads dataset, runs all 4 models sequentially in tmux
 - `cloud-init.yaml` — Full cloud-init for Nebius Ubuntu 24.04 + CUDA 13
 - `requirements-gpu.txt` — Python dependencies
 
@@ -36,14 +40,26 @@ Upload to the `v1.0` release in this repo.
 
 ## Outputs
 
-After training completes, the following files are in `models/`:
+After all training completes, models are in `models/`:
 
-- `vnc-classifier-best.pt` — PyTorch best model
-- `vnc-classifier.onnx` — ONNX export
-- `vnc-classifier-static.xml` + `.bin` — OpenVINO IR for NCS2
-- `vnc-classifier-labels.json` — Class label mapping
-- `training_report.json` — Final metrics
-- `vnc-checkpoint-latest.pt` — Latest checkpoint
+**VNC Classifier** (`models/`):
+- `vnc-classifier-best.pt`, `vnc-classifier.onnx`, `vnc-classifier-static.xml` + `.bin`
+- `vnc-classifier-labels.json`, `training_report.json`, `training_curves.json`
+
+**Alarm Detector** (`models/alarm/`):
+- `alarm-detector-best.pt`, `alarm-detector.onnx`, `alarm-detector-static.xml`
+- `alarm-detector-labels.json`, `alarm_detector_report.json`
+
+**OS Classifier** (`models/os/`):
+- `os-classifier-best.pt`, `os-classifier.onnx`, `os-classifier-static.xml`
+- `os-classifier-labels.json`, `os_classifier_report.json`
+
+**Anomaly Autoencoder** (`models/anomaly/`):
+- `anomaly-autoencoder-best.pt`, `anomaly-autoencoder.onnx`
+- `anomaly_detector_report.json` (includes anomaly threshold)
+
+**Reports** (`reports/`):
+- `vnc-training-report.html` — Full HTML report with benchmarks, confusion matrix, sample predictions
 
 ## Manual Run
 

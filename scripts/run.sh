@@ -57,6 +57,7 @@ fi
 tmux new-session -d -s train \
   "cd '$CLONE_DIR' && \
    source '$VENV/bin/activate' && \
+   echo '=== [1/4] VNC Screenshot Classifier ===' && \
    python3 scripts/train_vnc_tui.py \
      --data-dir '$DATA_DIR' \
      --output-dir '$CLONE_DIR/models' \
@@ -64,7 +65,31 @@ tmux new-session -d -s train \
      --batch-size 256 \
      --backbone mobilenetv2 \
      --resume \
-     2>&1 | tee /tmp/train.log"
+     2>&1 | tee /tmp/train.log && \
+   echo '=== [2/4] Alarm State Detector ===' && \
+   python3 scripts/train_alarm_detector.py \
+     --data-dir '$DATA_DIR' \
+     --output-dir '$CLONE_DIR/models/alarm' \
+     --epochs 30 \
+     --batch-size 256 \
+     2>&1 | tee /tmp/train_alarm.log && \
+   echo '=== [3/4] OS/Platform Classifier ===' && \
+   python3 scripts/train_os_classifier.py \
+     --data-dir '$DATA_DIR' \
+     --output-dir '$CLONE_DIR/models/os' \
+     --epochs 30 \
+     --batch-size 256 \
+     2>&1 | tee /tmp/train_os.log && \
+   echo '=== [4/4] Anomaly Autoencoder ===' && \
+   python3 scripts/train_anomaly_ae.py \
+     --data-dir '$DATA_DIR' \
+     --output-dir '$CLONE_DIR/models/anomaly' \
+     --epochs 30 \
+     --batch-size 256 \
+     2>&1 | tee /tmp/train_anomaly.log && \
+   echo '=== ALL TRAINING COMPLETE ===' && \
+   echo 'Models in: $CLONE_DIR/models/' && \
+   echo 'Reports in: $CLONE_DIR/reports/'"
 
-log "Training started. Attach with: tmux attach -t train"
-log "Monitor logs with: tail -f /tmp/train.log"
+log "Training pipeline started (4 models). Attach with: tmux attach -t train"
+log "Monitor: tail -f /tmp/train.log /tmp/train_alarm.log /tmp/train_os.log /tmp/train_anomaly.log"
