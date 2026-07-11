@@ -18,9 +18,14 @@ apt-get update -q
 apt-get install -y -q \
   python3.12 python3.12-venv python3.12-dev python3-pip \
   build-essential cmake pkg-config \
-  libopencv-dev libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev \
+  libopencv-dev libgl1 libglib2.0-0 libsm6 libxext6 libxrender-dev \
   git curl wget tmux htop nvtop unzip \
-  nodejs npm
+  nodejs npm \
+  || apt-get install -y -q --ignore-missing \
+  python3.12 python3.12-venv python3.12-dev python3-pip \
+  build-essential cmake pkg-config \
+  libopencv-dev libgl1 libglib2.0-0 libsm6 libxext6 libxrender-dev \
+  git curl wget tmux htop nvtop unzip
 
 # 2. Verify Python
 PYTHON="python3.12"
