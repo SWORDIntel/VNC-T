@@ -667,7 +667,7 @@ def main():
     print("Running inference benchmark...")
     benchmark = benchmark_inference(model, device, args.img_size, args.batch_size, args.benchmark_iterations)
     print(f"Throughput: {benchmark['throughput_imgs_sec']:.1f} imgs/sec")
-    if benchmark.get('cpu'):
+    if benchmark.get('cpu') and benchmark['cpu'].get('throughput_imgs_sec'):
         print(f"CPU Throughput: {benchmark['cpu']['throughput_imgs_sec']:.1f} imgs/sec")
         print(f"GPU Speedup: {benchmark['throughput_imgs_sec'] / benchmark['cpu']['throughput_imgs_sec']:.1f}x")
 
