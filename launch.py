@@ -470,7 +470,7 @@ def build_dashboard(data, ip):
     layout.split_column(
         Layout(name="header", size=3),
         Layout(name="body"),
-        Layout(name="footer", size=3),
+        Layout(name="footer", size=14),
     )
     layout["body"].split_row(
         Layout(name="left"),
@@ -495,10 +495,10 @@ def build_dashboard(data, ip):
     except json.JSONDecodeError:
         state = {}
 
-    table = Table(title="Pipeline State", box=box.ROUNDED, border_style="blue", expand=True)
-    table.add_column("Model", style="bold")
-    table.add_column("Status", justify="center")
-    table.add_column("Bar", ratio=1)
+    table = Table(title="Pipeline State", box=box.ROUNDED, border_style="blue", expand=True, show_lines=False)
+    table.add_column("Model", style="bold", ratio=3)
+    table.add_column("Status", justify="center", ratio=2)
+    table.add_column("Progress", ratio=2)
 
     total_done = 0
     for model_key in ["vnc_classifier", "alarm_detector", "os_classifier", "anomaly_ae", "cve_classifier"]:
@@ -547,16 +547,14 @@ def build_dashboard(data, ip):
     disk_lines = data.get("DISK", [])
     disk_text = f"[bold]Disk /opt:[/bold] {disk_lines[0] if disk_lines else 'unknown'}\n"
 
+    sys_content = (
+        f"{gpu_text}\n"
+        f"{tmux_text}\n"
+        f"{uptime_text}\n"
+        f"{disk_text}"
+    )
     sys_panel = Panel(
-        Text.assemble(
-            (gpu_text, ""),
-            ("\n", ""),
-            (tmux_text, ""),
-            ("\n", ""),
-            (uptime_text, ""),
-            ("\n", ""),
-            (disk_text, ""),
-        ),
+        sys_content,
         title="System",
         border_style="green",
         box=box.ROUNDED,
@@ -567,7 +565,7 @@ def build_dashboard(data, ip):
     log_lines = data.get("LOG", [])
     log_text = "\n".join(log_lines[-10:]) if log_lines else "[dim](no training logs yet)[/dim]"
     log_panel = Panel(
-        Text(log_text, style="dim"),
+        log_text,
         title="Recent Log Output",
         border_style="yellow",
         box=box.ROUNDED,
@@ -648,7 +646,7 @@ def run_tui(ip):
     current_ip = ip
 
     try:
-        with Live(build_dashboard({}, current_ip), console=console, refresh_per_second=0.2, screen=True) as live:
+        with Live(build_dashboard({}, current_ip), console=console, refresh_per_second=0.6, screen=True) as live:
             while True:
                 if _sigterm_flag:
                     live.stop()
