@@ -14,6 +14,7 @@ Usage:
 import argparse
 import json
 import os
+import signal
 import shutil
 import sys
 from pathlib import Path
@@ -247,6 +248,11 @@ def train(args):
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
     scaler = torch.cuda.amp.GradScaler() if device.type == "cuda" else None
 
+    # SIGTERM handler globals
+    global _sigterm_model, _sigterm_output_dir
+    _sigterm_model = model
+    _sigterm_output_dir = output_dir
+
     with open(output_dir / "os-classifier-labels.json", "w") as f:
         json.dump({"classes": OS_CLASSES, "class_to_idx": {c: i for i, c in enumerate(OS_CLASSES)}}, f, indent=2)
 
@@ -357,5 +363,21 @@ def get_args():
     return p.parse_args()
 
 
+_sigterm_model = None
+_sigterm_output_dir = None
+
+
+def _sigterm_handler(signum, frame):
+    console.print("\n[bold red]⚠ SIGTERM — preemptible VM shutdown! Saving checkpoint...[/bold red]")
+    if _sigterm_model is not None:
+        try:
+            torch.save(_sigterm_model.state_dict(), Path(_sigterm_output_dir) / "os-classifier-sigterm.pt")
+            console.print("[green]✓ Emergency checkpoint saved[/green]")
+        except Exception as e:
+            console.print(f"[red]Checkpoint failed: {e}[/red]")
+    sys.exit(143)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, _sigterm_handler)
     train(get_args())

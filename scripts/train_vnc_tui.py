@@ -10,6 +10,7 @@ Usage:
 import argparse
 import json
 import os
+import signal
 import shutil
 import sys
 import time
@@ -349,6 +350,13 @@ def train(args):
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
 
+    # Wire up SIGTERM handler globals
+    global _sigterm_model, _sigterm_optimizer, _sigterm_scheduler, _sigterm_output_dir
+    _sigterm_model = model
+    _sigterm_optimizer = optimizer
+    _sigterm_scheduler = scheduler
+    _sigterm_output_dir = output_dir
+
     # Resume
     start_epoch = 0
     best_val_acc = 0.0
@@ -401,6 +409,10 @@ def train(args):
 
     try:
         for epoch in range(start_epoch, args.epochs):
+            global _sigterm_best_acc, _sigterm_batch_size, _sigterm_epoch
+            _sigterm_best_acc = best_val_acc
+            _sigterm_batch_size = batch_size
+            _sigterm_epoch = epoch + 1
             state = "training"
             model.train()
             train_loss = 0.0
@@ -593,6 +605,33 @@ def train(args):
         raise
 
 
+# Global for signal handler
+_sigterm_model = None
+_sigterm_optimizer = None
+_sigterm_scheduler = None
+_sigterm_output_dir = None
+_sigterm_best_acc = None
+_sigterm_batch_size = None
+_sigterm_epoch = None
+
+
+def _sigterm_handler(signum, frame):
+    """Handle SIGTERM (preemptible VM shutdown) — save checkpoint and exit."""
+    console.print("\n[bold red]⚠ SIGTERM received — preemptible VM shutting down in 60s![/bold red]")
+    console.print("[yellow]Saving emergency checkpoint...[/yellow]")
+    if _sigterm_model is not None:
+        try:
+            save_checkpoint(_sigterm_output_dir, _sigterm_model, _sigterm_optimizer,
+                            _sigterm_scheduler, _sigterm_epoch or 0, _sigterm_best_acc or 0,
+                            "sigterm", _sigterm_batch_size or 256)
+            console.print("[green]✓ Emergency checkpoint saved — will resume on reboot[/green]")
+        except Exception as e:
+            console.print(f"[red]Failed to save checkpoint: {e}[/red]")
+    console.print("[yellow]Exiting gracefully...[/yellow]")
+    sys.exit(143)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, _sigterm_handler)
     args = get_args()
     train(args)

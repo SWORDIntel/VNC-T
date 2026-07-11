@@ -13,6 +13,7 @@ Usage:
 import argparse
 import json
 import os
+import signal
 import sys
 from pathlib import Path
 
@@ -194,6 +195,11 @@ def train(args):
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
     scaler = torch.cuda.amp.GradScaler() if device.type == "cuda" else None
 
+    # SIGTERM handler globals
+    global _sigterm_model, _sigterm_output_dir
+    _sigterm_model = model
+    _sigterm_output_dir = output_dir
+
     best_loss = float('inf')
     best_epoch = 0
     no_improve = 0
@@ -312,5 +318,21 @@ def get_args():
     return p.parse_args()
 
 
+_sigterm_model = None
+_sigterm_output_dir = None
+
+
+def _sigterm_handler(signum, frame):
+    console.print("\n[bold red]⚠ SIGTERM — preemptible VM shutdown! Saving checkpoint...[/bold red]")
+    if _sigterm_model is not None:
+        try:
+            torch.save(_sigterm_model.state_dict(), Path(_sigterm_output_dir) / "anomaly-autoencoder-sigterm.pt")
+            console.print("[green]✓ Emergency checkpoint saved[/green]")
+        except Exception as e:
+            console.print(f"[red]Checkpoint failed: {e}[/red]")
+    sys.exit(143)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, _sigterm_handler)
     train(get_args())

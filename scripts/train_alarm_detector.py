@@ -13,6 +13,7 @@ Usage:
 import argparse
 import json
 import os
+import signal
 import shutil
 import sys
 import time
@@ -223,6 +224,11 @@ def train(args):
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
     scaler = torch.cuda.amp.GradScaler() if device.type == "cuda" else None
 
+    # SIGTERM handler globals
+    global _sigterm_model, _sigterm_output_dir, _sigterm_best_acc, _sigterm_epoch
+    _sigterm_model = model
+    _sigterm_output_dir = output_dir
+
     # Save labels
     with open(output_dir / "alarm-detector-labels.json", "w") as f:
         json.dump({"classes": ALARM_CLASSES, "class_to_idx": {c: i for i, c in enumerate(ALARM_CLASSES)}}, f, indent=2)
@@ -233,6 +239,8 @@ def train(args):
     curves = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
 
     for epoch in range(args.epochs):
+        _sigterm_best_acc = best_acc
+        _sigterm_epoch = epoch + 1
         model.train()
         train_loss, train_correct, train_total = 0.0, 0, 0
         for images, labels in train_loader:
@@ -334,5 +342,23 @@ def get_args():
     return p.parse_args()
 
 
+_sigterm_model = None
+_sigterm_output_dir = None
+_sigterm_best_acc = 0.0
+_sigterm_epoch = 0
+
+
+def _sigterm_handler(signum, frame):
+    console.print("\n[bold red]⚠ SIGTERM — preemptible VM shutdown! Saving checkpoint...[/bold red]")
+    if _sigterm_model is not None:
+        try:
+            torch.save(_sigterm_model.state_dict(), Path(_sigterm_output_dir) / "alarm-detector-sigterm.pt")
+            console.print("[green]✓ Emergency checkpoint saved[/green]")
+        except Exception as e:
+            console.print(f"[red]Checkpoint failed: {e}[/red]")
+    sys.exit(143)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, _sigterm_handler)
     train(get_args())

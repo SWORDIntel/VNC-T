@@ -35,7 +35,7 @@ write_files:
       pip install google-antigravity || true
       python3 -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none')" || true
       if [ ! -d "$CLONE_DIR/.git" ]; then git clone "$REPO_URL" "$CLONE_DIR"; else (cd "$CLONE_DIR" && git pull); fi
-      chmod +x "$CLONE_DIR/scripts/setup.sh" "$CLONE_DIR/scripts/run.sh" "$CLONE_DIR/scripts/train_vnc_tui.py" "$CLONE_DIR/scripts/augment_dataset.py" || true
+      chmod +x "$CLONE_DIR/scripts/"*.py "$CLONE_DIR/scripts/"*.sh || true
       log "Setup complete."
 
   - path: /opt/vnc-run.sh
@@ -50,25 +50,49 @@ write_files:
       DATA_DIR="$CLONE_DIR/dataset"
       VENV="/opt/vnc-training"
       RELEASE_URL="https://github.com/SWORDIntel/VNC-T/releases/download/v1.0/dataset.tar.gz"
+      STATE_PY="$CLONE_DIR/scripts/pipeline_state.py"
       cd "$CLONE_DIR" || { git clone "$REPO_URL" "$CLONE_DIR"; cd "$CLONE_DIR"; }
       git pull || true
-      DATASET_ARCHIVE="/tmp/dataset.tar.gz"
-      if [ ! -f "$DATASET_ARCHIVE" ]; then
-        log "Downloading dataset..."
-        wget -q --show-progress "$RELEASE_URL" -O "$DATASET_ARCHIVE" || curl -L --progress-bar "$RELEASE_URL" -o "$DATASET_ARCHIVE" || { log "Dataset download failed"; exit 1; }
+      # Download dataset only if not already present
+      if [ ! -d "$DATA_DIR" ] || [ "$(find "$DATA_DIR" -type f | wc -l)" -lt 100 ]; then
+        DATASET_ARCHIVE="/tmp/dataset.tar.gz"
+        if [ ! -f "$DATASET_ARCHIVE" ]; then
+          log "Downloading dataset..."
+          wget -q --show-progress "$RELEASE_URL" -O "$DATASET_ARCHIVE" || curl -L --progress-bar "$RELEASE_URL" -o "$DATASET_ARCHIVE" || { log "Dataset download failed"; exit 1; }
+        fi
+        rm -rf "$DATA_DIR"; mkdir -p "$DATA_DIR"
+        tar xzf "$DATASET_ARCHIVE" -C "$DATA_DIR"
+        rm -f "$DATASET_ARCHIVE"
       fi
-      rm -rf "$DATA_DIR"
-      mkdir -p "$DATA_DIR"
-      tar xzf "$DATASET_ARCHIVE" -C "$DATA_DIR"
-      rm -f "$DATASET_ARCHIVE"
       CLASSES=$(find "$DATA_DIR" -maxdepth 1 -mindepth 1 -type d | wc -l)
       IMAGES=$(find "$DATA_DIR" -type f | wc -l)
       log "Dataset: $CLASSES classes, $IMAGES images"
       source "$VENV/bin/activate"
+      log "Pipeline state:"; python3 "$STATE_PY" show
+      CMD="cd '$CLONE_DIR' && source '$VENV/bin/activate'"
+      # Model 1: VNC Classifier
+      if python3 "$STATE_PY" check vnc_classifier; then log "✓ vnc_classifier done"; else
+        CMD="$CMD && echo '=== [1/4] VNC Classifier ===' && python3 '$STATE_PY' mark vnc_classifier running && python3 scripts/train_vnc_tui.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models' --epochs 50 --batch-size 256 --backbone mobilenetv2 --resume 2>&1 | tee /tmp/train.log && python3 '$STATE_PY' mark vnc_classifier done"
+      fi
+      # Model 2: Alarm Detector
+      if python3 "$STATE_PY" check alarm_detector; then log "✓ alarm_detector done"; else
+        CMD="$CMD && echo '=== [2/4] Alarm Detector ===' && python3 '$STATE_PY' mark alarm_detector running && python3 scripts/train_alarm_detector.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/alarm' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_alarm.log && python3 '$STATE_PY' mark alarm_detector done"
+      fi
+      # Model 3: OS Classifier
+      if python3 "$STATE_PY" check os_classifier; then log "✓ os_classifier done"; else
+        CMD="$CMD && echo '=== [3/4] OS Classifier ===' && python3 '$STATE_PY' mark os_classifier running && python3 scripts/train_os_classifier.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/os' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_os.log && python3 '$STATE_PY' mark os_classifier done"
+      fi
+      # Model 4: Anomaly Autoencoder
+      if python3 "$STATE_PY" check anomaly_ae; then log "✓ anomaly_ae done"; else
+        CMD="$CMD && echo '=== [4/4] Anomaly Autoencoder ===' && python3 '$STATE_PY' mark anomaly_ae running && python3 scripts/train_anomaly_ae.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/anomaly' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_anomaly.log && python3 '$STATE_PY' mark anomaly_ae done"
+      fi
+      CMD="$CMD && echo '=== ALL TRAINING COMPLETE ==='"
       if tmux has-session -t train 2>/dev/null; then tmux kill-session -t train; fi
-      tmux new-session -d -s train "cd '$CLONE_DIR' && source '$VENV/bin/activate' && echo '=== [1/4] VNC Screenshot Classifier ===' && python3 scripts/train_vnc_tui.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models' --epochs 50 --batch-size 256 --backbone mobilenetv2 --resume 2>&1 | tee /tmp/train.log && echo '=== [2/4] Alarm State Detector ===' && python3 scripts/train_alarm_detector.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/alarm' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_alarm.log && echo '=== [3/4] OS/Platform Classifier ===' && python3 scripts/train_os_classifier.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/os' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_os.log && echo '=== [4/4] Anomaly Autoencoder ===' && python3 scripts/train_anomaly_ae.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/anomaly' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_anomaly.log && echo '=== ALL TRAINING COMPLETE ==='"
-      log "Training pipeline started (4 models). Attach with: tmux attach -t train"
+      tmux new-session -d -s train "$CMD"
+      log "Pipeline started. Attach: tmux attach -t train"
 
 runcmd:
-  - bash /opt/vnc-setup.sh
+  # Only run full setup on first boot — check for sentinel file
+  - if [ ! -f /opt/vnc-setup-done ]; then bash /opt/vnc-setup.sh && touch /opt/vnc-setup-done; fi
+  # Always run the pipeline (resume-safe via pipeline_state.json)
   - bash /opt/vnc-run.sh
