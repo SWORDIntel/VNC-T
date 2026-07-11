@@ -1,6 +1,6 @@
 # Dataset / models (release assets)
-# dataset/
-# models/
+dataset/
+models/
 *.tar.gz
 *.zip
 
