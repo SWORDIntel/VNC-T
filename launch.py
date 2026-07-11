@@ -190,10 +190,10 @@ def wait_for_ssh(ip, timeout=600):
 
 def ssh_cmd(ip, remote_cmd, timeout=15):
     """Run a command on the VM via SSH."""
-    return run(
-        f"ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes "
-        f"-i {SSH_KEY} {SSH_USER}@{ip} '{remote_cmd}'",
-        timeout=timeout,
+    return subprocess.run(
+        ["ssh", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=no",
+         "-o", "BatchMode=yes", "-i", SSH_KEY, f"{SSH_USER}@{ip}", remote_cmd],
+        capture_output=True, text=True, timeout=timeout,
     )
 
 
