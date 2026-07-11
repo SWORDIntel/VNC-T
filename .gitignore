@@ -1,6 +1,9 @@
-# Dataset / models (release assets)
+# Dataset / models / runtime state (release assets)
 dataset/
 models/
+reports/
+pipeline_state.json
+nvd_data/
 *.tar.gz
 *.zip
 

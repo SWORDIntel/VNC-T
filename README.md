@@ -87,3 +87,44 @@ The setup script also installs (non-fatal if they fail):
 ## License
 
 Internal SWORD Intel use.
+
+## Preemptible VM Support
+
+The pipeline is designed for preemptible (spot) VMs that can be killed at any time with a 60-second SIGTERM notice.
+
+**How it works:**
+
+1. **SIGTERM handler** in every training script catches the signal and saves an emergency checkpoint before exit
+2. **`pipeline_state.json`** tracks which models have completed — survives reboots
+3. **`cloud-init.yaml`** only runs full setup on first boot (sentinel file), then always re-runs the pipeline
+4. **`run.sh`** skips completed models and resumes from the interrupted one
+5. **Dataset** is only re-downloaded if missing (not every boot)
+
+**State management:**
+
+```bash
+python3 scripts/pipeline_state.py show    # current state
+python3 scripts/pipeline_state.py reset   # reset all to pending
+```
+
+The VM can be killed and restarted multiple times — it always picks up where it left off.
+
+## Pipeline Overview
+
+```
+cloud-init.yaml
+  ├─ first boot: /opt/vnc-setup.sh  (install CUDA, PyTorch, deps)
+  └─ every boot: /opt/vnc-run.sh    (resume pipeline)
+       └─ tmux session "train"
+            ├─ [1/5] VNC Screenshot Classifier   (MobileNetV2, 50 epochs)
+            ├─ [2/5] Alarm State Detector         (MobileNetV2, 30 epochs)
+            ├─ [3/5] OS/Platform Classifier       (MobileNetV3, 30 epochs)
+            ├─ [4/5] Anomaly Autoencoder          (ConvAE, 30 epochs)
+            └─ [5/5] CVE Vulnerability Classifier  (TextCNN, 15 epochs)
+```
+
+Each model:
+- Trains with AMP (mixed precision) on the L40s GPU
+- Saves best checkpoint + training curves
+- Exports to ONNX (and OpenVINO IR where applicable)
+- Handles SIGTERM → emergency checkpoint → resume on reboot

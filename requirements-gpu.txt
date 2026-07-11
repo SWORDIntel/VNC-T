@@ -1,5 +1,5 @@
-# Core ML
---index-url https://download.pytorch.org/whl/cu126
+# Core ML — CUDA 12.6 wheels from PyTorch, fallback to PyPI
+--extra-index-url https://download.pytorch.org/whl/cu126
 torch>=2.5.0
 torchvision>=0.21.0
 

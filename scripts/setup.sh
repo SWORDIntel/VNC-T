@@ -82,6 +82,6 @@ else
 fi
 
 # 13. Make scripts executable
-chmod +x "$CLONE_DIR/scripts/setup.sh" "$CLONE_DIR/scripts/run.sh" "$CLONE_DIR/scripts/train_vnc_tui.py" "$CLONE_DIR/scripts/augment_dataset.py" || true
+chmod +x "$CLONE_DIR/scripts/"*.py "$CLONE_DIR/scripts/"*.sh || true
 
 log "Setup complete. Run /opt/vnc-training-repo/scripts/run.sh to start training."
