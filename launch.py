@@ -321,24 +321,33 @@ def do_create():
         "public_ip_address": {},
     }])
 
-    cmd = (
-        f"nebius compute instance create "
-        f"--name {VM_NAME} "
-        f"--parent-id {PROJECT_ID} "
-        f"--resources-platform {PLATFORM} "
-        f"--resources-preset {PRESET} "
-        f"--boot-disk-managed-disk-size-gibibytes {DISK_SIZE_GIB} "
-        f"--boot-disk-managed-disk-type {DISK_TYPE} "
-        f"--boot-disk-managed-disk-source-image-family-image-family {IMAGE_FAMILY} "
-        f"--boot-disk-attach-mode READ_WRITE "
-        f"--preemptible-on-preemption stop "
-        f"--recovery-policy recover "
-        f"--cloud-init-user-data '{cloud_init.replace(chr(39), chr(92)+chr(39))}' "
-        f"--network-interfaces '{net_json}'"
-    )
-    r = run(cmd, timeout=120, check=True)
-    if r.returncode == 0:
-        console.print("[green]VM created![/green]")
+    cmd_args = [
+        "nebius", "compute", "instance", "create",
+        "--name", VM_NAME,
+        "--parent-id", PROJECT_ID,
+        "--resources-platform", PLATFORM,
+        "--resources-preset", PRESET,
+        "--boot-disk-managed-disk-size-gibibytes", DISK_SIZE_GIB,
+        "--boot-disk-managed-disk-type", DISK_TYPE,
+        "--boot-disk-managed-disk-source-image-family-image-family", IMAGE_FAMILY,
+        "--boot-disk-attach-mode", "READ_WRITE",
+        "--preemptible-on-preemption", "stop",
+        "--recovery-policy", "recover",
+        "--cloud-init-user-data", cloud_init,
+        "--network-interfaces", net_json,
+    ]
+    try:
+        r = subprocess.run(cmd_args, capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            console.print(f"[red]VM creation failed:[/red]")
+            if r.stderr:
+                console.print(r.stderr[:2000])
+            if r.stdout:
+                console.print(r.stdout[:2000])
+        else:
+            console.print("[green]VM created![/green]")
+    except subprocess.TimeoutExpired:
+        console.print("[red]VM creation timed out[/red]")
 
 
 def do_create_and_monitor():
