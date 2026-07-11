@@ -76,6 +76,11 @@ from rich import box
 
 console = Console()
 
+# Ensure nebius CLI is on PATH (installer puts it in ~/.nebius/bin)
+_nebius_bin = os.path.expanduser("~/.nebius/bin")
+if os.path.isdir(_nebius_bin) and _nebius_bin not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = _nebius_bin + os.pathsep + os.environ["PATH"]
+
 # SIGTERM handler — so the launcher exits cleanly if the local machine is shutting down
 _sigterm_flag = False
 
@@ -138,7 +143,7 @@ def check_deps():
 
 
 def get_vm_json():
-    r = run(f"nebius compute instance get-by-name --name {VM_NAME} --format json")
+    r = run(f"nebius compute instance get-by-name --name {VM_NAME} --parent-id {PROJECT_ID} --format json")
     try:
         return json.loads(r.stdout) if r.stdout.strip() else {}
     except json.JSONDecodeError:
