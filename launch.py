@@ -13,12 +13,19 @@ Usage:
   python3 launch.py --start                  # start a stopped VM
   python3 launch.py --delete                 # delete the VM
   python3 launch.py --seed                   # just pre-seed repo to VM
+  python3 launch.py --download               # download trained models from VM
 
 Requires: nebius CLI, jq, ssh, rsync, Python rich
+
+Features:
+  - Auto-resume: if VM is preempted (SIGTERM), waits for reboot, re-seeds, resumes pipeline
+  - Auto-download: when all 5 models complete, rsyncs models to local ./models/
+  - SIGTERM-safe: launcher exits cleanly if local machine shuts down
 """
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -68,6 +75,15 @@ from rich.align import Align
 from rich import box
 
 console = Console()
+
+# SIGTERM handler — so the launcher exits cleanly if the local machine is shutting down
+_sigterm_flag = False
+
+def _sigterm_handler(signum, frame):
+    global _sigterm_flag
+    _sigterm_flag = True
+
+signal.signal(signal.SIGTERM, _sigterm_handler)
 
 # --- Config (override via env vars) ---
 VM_NAME = os.environ.get("VM_NAME", "vnc-training")
@@ -523,24 +539,151 @@ def build_dashboard(data, ip):
     return layout
 
 
+def build_dashboard_with_banner(data, ip, banner_msg):
+    """Build dashboard with a status banner overlaid on the header."""
+    layout = build_dashboard(data, ip)
+    # Replace header with banner version
+    header = Panel(
+        Align.center(
+            Text(banner_msg, style="bold yellow", justify="center")
+            + Text(f"  |  {SSH_USER}@{ip}  |  {time.strftime('%H:%M:%S')}", style="dim", justify="center")
+        ),
+        border_style="yellow",
+    )
+    layout["header"].update(header)
+    return layout
+
+
+def download_models(ip):
+    """Rsync trained models from VM to local repo."""
+    local_models = REPO_DIR / "models"
+    local_models.mkdir(exist_ok=True)
+    console.print("[cyan]Downloading trained models from VM...[/cyan]")
+    r = run(
+        f"rsync -azP --progress "
+        f"-e 'ssh -o StrictHostKeyChecking=no -i {SSH_KEY}' "
+        f"{SSH_USER}@{ip}:/opt/vnc-training-repo/models/ {local_models}/",
+        timeout=300,
+    )
+    if r.returncode == 0:
+        # Also grab reports if they exist
+        run(
+            f"rsync -azP "
+            f"-e 'ssh -o StrictHostKeyChecking=no -i {SSH_KEY}' "
+            f"{SSH_USER}@{ip}:/opt/vnc-training-repo/reports/ {REPO_DIR / 'reports'}/ 2>/dev/null",
+            timeout=60,
+        )
+        console.print(f"[green]Models downloaded to {local_models}/[/green]")
+        # List what we got
+        for root, dirs, files in os.walk(local_models):
+            for f in files:
+                p = Path(root) / f
+                size_mb = p.stat().st_size / (1024 * 1024)
+                console.print(f"  {p.relative_to(local_models)} ({size_mb:.1f} MB)")
+        return True
+    else:
+        console.print(f"[red]Model download failed: {r.stderr}[/red]")
+        return False
+
+
+def check_all_done(ip):
+    """Check if all 5 models are done training."""
+    data = fetch_vm_state(ip)
+    state_lines = data.get("STATE", [])
+    state_json = "\n".join(state_lines).strip()
+    try:
+        state = json.loads(state_json) if state_json else {}
+    except json.JSONDecodeError:
+        return False
+    return all(state.get(m) == "done" for m in MODEL_NAMES)
+
+
 def run_tui(ip):
-    """Run the live TUI dashboard."""
+    """Run the live TUI dashboard with auto-resume and auto-download."""
     console.print(f"[cyan]Starting TUI dashboard (Ctrl+C to exit, VM keeps running)...[/cyan]")
-    console.print(f"[dim]Connect manually: ssh -i {SSH_KEY} {SSH_USER}@{ip}[/dim]\n")
+    console.print(f"[dim]Connect manually: ssh -i {SSH_KEY} {SSH_USER}@{ip}[/dim]")
+    console.print(f"[dim]Auto-resume: if VM is preempted, will wait for reboot and re-seed[/dim]")
+    console.print(f"[dim]Auto-download: models pulled locally when all 5 complete[/dim]\n")
+
+    models_downloaded = False
+    vm_was_down = False
+    current_ip = ip
 
     try:
-        with Live(build_dashboard({}, ip), console=console, refresh_per_second=0.2, screen=True) as live:
+        with Live(build_dashboard({}, current_ip), console=console, refresh_per_second=0.2, screen=True) as live:
             while True:
+                if _sigterm_flag:
+                    live.stop()
+                    console.print("\n[yellow]SIGTERM received — exiting launcher. VM keeps running.[/yellow]")
+                    return
+
+                # Check VM status
+                vm_status = get_vm_status()
+
+                if vm_status in ("stopped", "stopping", "not_found"):
+                    # VM was preempted or stopped — wait for it to come back
+                    if not vm_was_down:
+                        vm_was_down = True
+                        models_downloaded = False  # reset in case we need to re-check after resume
+                        live.update(build_dashboard_with_banner(
+                            {}, current_ip,
+                            f"⚠ VM {vm_status.upper()} — waiting for reboot... (auto-resumes when back up)"
+                        ))
+
+                    # Poll every 15s for VM to come back
+                    time.sleep(15)
+                    continue
+
+                if vm_was_down and vm_status == "running":
+                    # VM is back up — wait for SSH, re-seed, resume
+                    live.update(build_dashboard_with_banner(
+                        {}, current_ip,
+                        "🔄 VM back up — waiting for SSH..."
+                    ))
+                    new_ip = wait_for_ip(timeout=60)
+                    if new_ip:
+                        current_ip = new_ip
+                        if wait_for_ssh(current_ip, timeout=120):
+                            live.update(build_dashboard_with_banner(
+                                {}, current_ip,
+                                "🔄 SSH up — re-seeding repo..."
+                            ))
+                            preseed_vm(current_ip)
+                            vm_was_down = False
+                            live.update(build_dashboard_with_banner(
+                                {}, current_ip,
+                                "✅ Pipeline resumed!"
+                            ))
+                            time.sleep(3)
+                    continue
+
+                # Normal monitoring — fetch state and update dashboard
                 try:
-                    data = fetch_vm_state(ip)
-                    live.update(build_dashboard(data, ip))
+                    data = fetch_vm_state(current_ip)
+                    live.update(build_dashboard(data, current_ip))
+
+                    # Check if all models are done
+                    if not models_downloaded and check_all_done(current_ip):
+                        models_downloaded = True
+                        live.update(build_dashboard_with_banner(
+                            data, current_ip,
+                            "🎉 All 5 models complete! Downloading models..."
+                        ))
+                        download_models(current_ip)
+                        live.update(build_dashboard_with_banner(
+                            data, current_ip,
+                            "✅ Models downloaded! Check ./models/ directory. Ctrl+C to exit."
+                        ))
                 except Exception:
-                    live.update(build_dashboard({}, ip))
+                    live.update(build_dashboard({}, current_ip))
+
                 time.sleep(5)
     except KeyboardInterrupt:
         console.print("\n[yellow]Exited monitor. VM is still running.[/yellow]")
         console.print(f"[dim]Reconnect: python3 launch.py --monitor[/dim]")
-        console.print(f"[dim]SSH:       ssh -i {SSH_KEY} {SSH_USER}@{ip}[/dim]")
+        console.print(f"[dim]SSH:       ssh -i {SSH_KEY} {SSH_USER}@{current_ip}[/dim]")
+        if not models_downloaded:
+            console.print(f"[dim]Download models: python3 launch.py --download[/dim]")
 
 
 # --- Main ---
@@ -556,6 +699,7 @@ def main():
     parser.add_argument("--start", action="store_true", help="Start VM")
     parser.add_argument("--delete", "-d", action="store_true", help="Delete VM")
     parser.add_argument("--seed", action="store_true", help="Pre-seed repo to VM only")
+    parser.add_argument("--download", action="store_true", help="Download trained models from VM")
     parser.add_argument("--create", "-c", action="store_true", help="Create VM only")
     args = parser.parse_args()
 
@@ -575,6 +719,12 @@ def main():
             console.print("[red]No VM found.[/red]")
             sys.exit(1)
         preseed_vm(ip)
+    elif args.download:
+        ip = SSH_HOST or get_vm_ip()
+        if not ip:
+            console.print("[red]No VM found or no public IP.[/red]")
+            sys.exit(1)
+        download_models(ip)
     elif args.create:
         do_create()
     elif args.monitor:

@@ -53,6 +53,14 @@ python3 launch.py --delete
 - Recent training log output (last 10 lines)
 - Ctrl+C exits the dashboard — VM keeps training
 
+**Auto-resume**: If the VM gets preempted (SIGTERM → stopped), the launcher detects it, shows a "waiting for reboot" banner, polls until the VM is running again, waits for SSH, re-seeds the repo, and the pipeline resumes from `pipeline_state.json`. No manual intervention needed — just leave the launcher running.
+
+**Auto-download**: When all 5 models show ✅ done, the launcher automatically `rsync`s the trained models from the VM to your local `./models/` directory and lists what was downloaded. You can also trigger this manually:
+
+```bash
+python3 launch.py --download
+```
+
 ## Files
 
 - `launch.py` — TUI launcher: create VM, pre-seed repo, live dashboard
