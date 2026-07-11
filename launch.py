@@ -98,7 +98,7 @@ PRESET = os.environ.get("PRESET", "1gpu-40vcpu-160gb")
 SUBNET_ID = os.environ.get("SUBNET_ID", "vpcsubnet-e00j50ben51r17797n")
 DISK_SIZE_GIB = os.environ.get("DISK_SIZE_GIB", "250")
 DISK_TYPE = os.environ.get("DISK_TYPE", "network_ssd")
-IMAGE_FAMILY = os.environ.get("IMAGE_FAMILY", "ubuntu24.04-cuda13")
+IMAGE_ID = os.environ.get("IMAGE_ID", "computeimage-e00a3v28fye33a5gyn")  # ubuntu24.04-cuda13.0 latest
 SSH_USER = os.environ.get("SSH_USER", "john")
 SSH_KEY = os.environ.get("SSH_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
 SSH_HOST = os.environ.get("SSH_HOST", "")
@@ -315,7 +315,7 @@ def do_create():
     console.print(f"  Platform: {PLATFORM}")
     console.print(f"  Preset:   {PRESET}")
     console.print(f"  Disk:     {DISK_SIZE_GIB}GiB {DISK_TYPE}")
-    console.print(f"  Image:    {IMAGE_FAMILY}")
+    console.print(f"  Image ID: {IMAGE_ID}")
     console.print(f"  Subnet:   {SUBNET_ID}")
 
     cloud_init = CLOUD_INIT_FILE.read_text()
@@ -335,7 +335,7 @@ def do_create():
         "--boot-disk-managed-disk-name", f"{VM_NAME}-boot-disk",
         "--boot-disk-managed-disk-size-gibibytes", DISK_SIZE_GIB,
         "--boot-disk-managed-disk-type", DISK_TYPE,
-        "--boot-disk-managed-disk-source-image-family-image-family", IMAGE_FAMILY,
+        "--boot-disk-managed-disk-source-image-id", IMAGE_ID,
         "--boot-disk-attach-mode", "READ_WRITE",
         "--preemptible-on-preemption", "stop",
         "--recovery-policy", "recover",
