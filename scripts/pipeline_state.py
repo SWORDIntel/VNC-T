@@ -14,7 +14,7 @@ import json
 import sys
 from pathlib import Path
 
-MODELS = ["vnc_classifier", "alarm_detector", "os_classifier", "anomaly_ae"]
+MODELS = ["vnc_classifier", "alarm_detector", "os_classifier", "anomaly_ae", "cve_classifier"]
 STATE_FILE = Path(__file__).parent.parent / "pipeline_state.json"
 
 

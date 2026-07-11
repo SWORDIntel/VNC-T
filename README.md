@@ -19,10 +19,12 @@ Training will auto-start via cloud-init. The TUI shows live progress, per-class 
 - `scripts/train_alarm_detector.py` — Alarm state detector (normal/warning/alarm/critical, pseudo-labeled from color heuristics)
 - `scripts/train_os_classifier.py` — OS/platform classifier (Windows/Linux/embedded/server/kiosk, MobileNetV3)
 - `scripts/train_anomaly_ae.py` — Anomaly autoencoder (unsupervised, ConvAE, reconstruction error = anomaly score)
+- `scripts/train_cve_classifier.py` — CVE vulnerability type classifier (TextCNN, downloads NVD data, classifies CVEs as RCE/LPE/DoS/etc.)
+- `scripts/pipeline_state.py` — Pipeline state tracker for preemptible VM resume
 - `scripts/generate_report.py` — Fancy HTML report with benchmarks, confusion matrix, training curves, sample predictions
 - `scripts/augment_dataset.py` — Smart OpenCV augmentation using visual heuristics
 - `scripts/setup.sh` — Installs PyTorch/CUDA, dev tools (Codex CLI, Google agents-cli, Antigravity SDK)
-- `scripts/run.sh` — Downloads dataset, runs all 4 models sequentially in tmux
+- `scripts/run.sh` — Downloads dataset, runs all 5 models sequentially in tmux (preemptible VM safe)
 - `cloud-init.yaml` — Full cloud-init for Nebius Ubuntu 24.04 + CUDA 13
 - `requirements-gpu.txt` — Python dependencies
 
@@ -57,6 +59,10 @@ After all training completes, models are in `models/`:
 **Anomaly Autoencoder** (`models/anomaly/`):
 - `anomaly-autoencoder-best.pt`, `anomaly-autoencoder.onnx`
 - `anomaly_detector_report.json` (includes anomaly threshold)
+
+**CVE Classifier** (`models/cve/`):
+- `cve-classifier-best.pt`, `cve-classifier.onnx`
+- `cve-vocab.json`, `cve-classifier-labels.json`, `cve_classifier_report.json`
 
 **Reports** (`reports/`):
 - `vnc-training-report.html` — Full HTML report with benchmarks, confusion matrix, sample predictions

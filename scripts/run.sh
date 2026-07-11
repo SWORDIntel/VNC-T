@@ -60,7 +60,7 @@ CMD="cd '$CLONE_DIR' && source '$VENV/bin/activate'"
 if python3 "$STATE_PY" check vnc_classifier; then
   log "✓ vnc_classifier already done — skipping"
 else
-  CMD="$CMD && echo '=== [1/4] VNC Screenshot Classifier ==='"
+  CMD="$CMD && echo '=== [1/5] VNC Screenshot Classifier ==='"
   CMD="$CMD && python3 '$STATE_PY' mark vnc_classifier running"
   CMD="$CMD && python3 scripts/train_vnc_tui.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models' --epochs 50 --batch-size 256 --backbone mobilenetv2 --resume 2>&1 | tee /tmp/train.log"
   CMD="$CMD && python3 '$STATE_PY' mark vnc_classifier done"
@@ -70,7 +70,7 @@ fi
 if python3 "$STATE_PY" check alarm_detector; then
   log "✓ alarm_detector already done — skipping"
 else
-  CMD="$CMD && echo '=== [2/4] Alarm State Detector ==='"
+  CMD="$CMD && echo '=== [2/5] Alarm State Detector ==='"
   CMD="$CMD && python3 '$STATE_PY' mark alarm_detector running"
   CMD="$CMD && python3 scripts/train_alarm_detector.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/alarm' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_alarm.log"
   CMD="$CMD && python3 '$STATE_PY' mark alarm_detector done"
@@ -80,7 +80,7 @@ fi
 if python3 "$STATE_PY" check os_classifier; then
   log "✓ os_classifier already done — skipping"
 else
-  CMD="$CMD && echo '=== [3/4] OS/Platform Classifier ==='"
+  CMD="$CMD && echo '=== [3/5] OS/Platform Classifier ==='"
   CMD="$CMD && python3 '$STATE_PY' mark os_classifier running"
   CMD="$CMD && python3 scripts/train_os_classifier.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/os' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_os.log"
   CMD="$CMD && python3 '$STATE_PY' mark os_classifier done"
@@ -90,10 +90,20 @@ fi
 if python3 "$STATE_PY" check anomaly_ae; then
   log "✓ anomaly_ae already done — skipping"
 else
-  CMD="$CMD && echo '=== [4/4] Anomaly Autoencoder ==='"
+  CMD="$CMD && echo '=== [4/5] Anomaly Autoencoder ==='"
   CMD="$CMD && python3 '$STATE_PY' mark anomaly_ae running"
   CMD="$CMD && python3 scripts/train_anomaly_ae.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/anomaly' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_anomaly.log"
   CMD="$CMD && python3 '$STATE_PY' mark anomaly_ae done"
+fi
+
+# Model 5: CVE Vulnerability Type Classifier
+if python3 "$STATE_PY" check cve_classifier; then
+  log "✓ cve_classifier already done — skipping"
+else
+  CMD="$CMD && echo '=== [5/5] CVE Vulnerability Type Classifier ==='"
+  CMD="$CMD && python3 '$STATE_PY' mark cve_classifier running"
+  CMD="$CMD && python3 scripts/train_cve_classifier.py --output-dir '$CLONE_DIR/models/cve' --epochs 15 --batch-size 256 2>&1 | tee /tmp/train_cve.log"
+  CMD="$CMD && python3 '$STATE_PY' mark cve_classifier done"
 fi
 
 CMD="$CMD && echo '=== ALL TRAINING COMPLETE ===' && echo 'Models in: $CLONE_DIR/models/' && echo 'Reports in: $CLONE_DIR/reports/'"

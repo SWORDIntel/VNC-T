@@ -72,19 +72,23 @@ write_files:
       CMD="cd '$CLONE_DIR' && source '$VENV/bin/activate'"
       # Model 1: VNC Classifier
       if python3 "$STATE_PY" check vnc_classifier; then log "✓ vnc_classifier done"; else
-        CMD="$CMD && echo '=== [1/4] VNC Classifier ===' && python3 '$STATE_PY' mark vnc_classifier running && python3 scripts/train_vnc_tui.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models' --epochs 50 --batch-size 256 --backbone mobilenetv2 --resume 2>&1 | tee /tmp/train.log && python3 '$STATE_PY' mark vnc_classifier done"
+        CMD="$CMD && echo '=== [1/5] VNC Classifier ===' && python3 '$STATE_PY' mark vnc_classifier running && python3 scripts/train_vnc_tui.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models' --epochs 50 --batch-size 256 --backbone mobilenetv2 --resume 2>&1 | tee /tmp/train.log && python3 '$STATE_PY' mark vnc_classifier done"
       fi
       # Model 2: Alarm Detector
       if python3 "$STATE_PY" check alarm_detector; then log "✓ alarm_detector done"; else
-        CMD="$CMD && echo '=== [2/4] Alarm Detector ===' && python3 '$STATE_PY' mark alarm_detector running && python3 scripts/train_alarm_detector.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/alarm' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_alarm.log && python3 '$STATE_PY' mark alarm_detector done"
+        CMD="$CMD && echo '=== [2/5] Alarm Detector ===' && python3 '$STATE_PY' mark alarm_detector running && python3 scripts/train_alarm_detector.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/alarm' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_alarm.log && python3 '$STATE_PY' mark alarm_detector done"
       fi
       # Model 3: OS Classifier
       if python3 "$STATE_PY" check os_classifier; then log "✓ os_classifier done"; else
-        CMD="$CMD && echo '=== [3/4] OS Classifier ===' && python3 '$STATE_PY' mark os_classifier running && python3 scripts/train_os_classifier.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/os' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_os.log && python3 '$STATE_PY' mark os_classifier done"
+        CMD="$CMD && echo '=== [3/5] OS Classifier ===' && python3 '$STATE_PY' mark os_classifier running && python3 scripts/train_os_classifier.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/os' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_os.log && python3 '$STATE_PY' mark os_classifier done"
       fi
       # Model 4: Anomaly Autoencoder
       if python3 "$STATE_PY" check anomaly_ae; then log "✓ anomaly_ae done"; else
-        CMD="$CMD && echo '=== [4/4] Anomaly Autoencoder ===' && python3 '$STATE_PY' mark anomaly_ae running && python3 scripts/train_anomaly_ae.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/anomaly' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_anomaly.log && python3 '$STATE_PY' mark anomaly_ae done"
+        CMD="$CMD && echo '=== [4/5] Anomaly Autoencoder ===' && python3 '$STATE_PY' mark anomaly_ae running && python3 scripts/train_anomaly_ae.py --data-dir '$DATA_DIR' --output-dir '$CLONE_DIR/models/anomaly' --epochs 30 --batch-size 256 2>&1 | tee /tmp/train_anomaly.log && python3 '$STATE_PY' mark anomaly_ae done"
+      fi
+      # Model 5: CVE Classifier
+      if python3 "$STATE_PY" check cve_classifier; then log "✓ cve_classifier done"; else
+        CMD="$CMD && echo '=== [5/5] CVE Classifier ===' && python3 '$STATE_PY' mark cve_classifier running && python3 scripts/train_cve_classifier.py --output-dir '$CLONE_DIR/models/cve' --epochs 15 --batch-size 256 2>&1 | tee /tmp/train_cve.log && python3 '$STATE_PY' mark cve_classifier done"
       fi
       CMD="$CMD && echo '=== ALL TRAINING COMPLETE ==='"
       if tmux has-session -t train 2>/dev/null; then tmux kill-session -t train; fi
