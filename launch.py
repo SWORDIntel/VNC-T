@@ -371,21 +371,38 @@ def do_create_and_monitor():
     run_tui(ip)
 
 
+def get_vm_id():
+    j = get_vm_json()
+    return j.get("metadata", {}).get("id", "")
+
+
 def do_delete():
     console.print(f"[cyan]Deleting VM '{VM_NAME}'...[/cyan]")
-    run(f"nebius compute instance delete --name {VM_NAME}", timeout=60)
+    vm_id = get_vm_id()
+    if not vm_id:
+        console.print("[red]VM not found.[/red]")
+        return
+    run(f"nebius compute instance delete {vm_id}", timeout=120)
     console.print("[green]VM deleted.[/green]")
 
 
 def do_stop():
     console.print(f"[cyan]Stopping VM '{VM_NAME}'...[/cyan]")
-    run(f"nebius compute instance stop --name {VM_NAME}", timeout=60)
+    vm_id = get_vm_id()
+    if not vm_id:
+        console.print("[red]VM not found.[/red]")
+        return
+    run(f"nebius compute instance stop {vm_id}", timeout=60)
     console.print("[green]VM stopped.[/green]")
 
 
 def do_start():
     console.print(f"[cyan]Starting VM '{VM_NAME}'...[/cyan]")
-    run(f"nebius compute instance start --name {VM_NAME}", timeout=60)
+    vm_id = get_vm_id()
+    if not vm_id:
+        console.print("[red]VM not found.[/red]")
+        return
+    run(f"nebius compute instance start {vm_id}", timeout=60)
     console.print("[green]VM starting. Pipeline will auto-resume via cloud-init.[/green]")
 
 
