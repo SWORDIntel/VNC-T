@@ -13,6 +13,35 @@ tmux attach -t train
 
 Training will auto-start via cloud-init. The TUI shows live progress, per-class accuracy, GPU memory, and best validation accuracy.
 
+## CLI Launcher
+
+`launch.sh` in the repo root creates the VM via Nebius CLI, waits for SSH, and drops into a live progress monitor.
+
+```bash
+# Full: create VM + wait + monitor
+export PROJECT_ID=proj-xxx
+export PLATFORM=<platform>          # nebius compute platform list
+export PRESET=<preset>              # nebius compute preset list
+export SUBNET_ID=<subnet-id>        # nebius vpc subnet list
+./launch.sh
+
+# Just monitor an existing VM
+./launch.sh --monitor
+
+# Check VM status + pipeline state
+./launch.sh --status
+
+# SSH in directly
+./launch.sh --ssh
+
+# Stop / start / delete
+./launch.sh --stop
+./launch.sh --start
+./launch.sh --delete
+```
+
+The progress monitor shows pipeline state (✅/🔄/⏳ per model), GPU utilization, tmux session status, and recent log output — refreshing every 5 seconds. Ctrl+C exits the monitor (VM keeps running).
+
 ## Files
 
 - `scripts/train_vnc_tui.py` — Main VNC screenshot classifier (MobileNetV2, Rich TUI, AMP, checkpointing, ONNX/OpenVINO export)

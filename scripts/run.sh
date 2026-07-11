@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-# Auto-run script: download dataset, run 4-model training pipeline in tmux
+# Auto-run script: download dataset, run 5-model training pipeline in tmux
 # Handles preemptible VM SIGTERM — resumes from pipeline_state.json on reboot
 exec > >(tee /var/log/vnc-run.log) 2>&1
 
