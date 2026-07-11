@@ -100,7 +100,7 @@ DISK_SIZE_GIB = os.environ.get("DISK_SIZE_GIB", "250")
 DISK_TYPE = os.environ.get("DISK_TYPE", "network_ssd")
 IMAGE_ID = os.environ.get("IMAGE_ID", "computeimage-e00a3v28fye33a5gyn")  # ubuntu24.04-cuda13.0 latest
 SSH_USER = os.environ.get("SSH_USER", "john")
-SSH_KEY = os.environ.get("SSH_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
+SSH_KEY = os.environ.get("SSH_KEY", os.path.expanduser("~/.ssh/id_rsa"))
 SSH_HOST = os.environ.get("SSH_HOST", "")
 REPO_DIR = Path(__file__).parent.resolve()
 CLOUD_INIT_FILE = REPO_DIR / "cloud-init.yaml"
@@ -173,7 +173,7 @@ def wait_for_ip(timeout=150):
     return None
 
 
-def wait_for_ssh(ip, timeout=300):
+def wait_for_ssh(ip, timeout=600):
     console.print(f"[cyan]Waiting for SSH at {ip}...[/cyan]")
     for i in range(timeout // 5):
         r = run(

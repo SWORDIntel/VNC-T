@@ -4,7 +4,7 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     ssh_authorized_keys:
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtCAa2bsj2jENXmtoGUuqIcM50P4UTO5qSdO5jRYily nvidia-nebious-cloud
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDQYFuXKgr0S7EYvcKjwG2mGDLXT+sMLIpDGeIDMycLDpyfUfLjzmZNNl5vO+CayBhdV6ps8SFEyXgEJxJI3vjERoKr6JpCOUw1C8s7ur14/at91eOVJiKqYyo/E672e/7BhYVBor5bMlBoQC6p4D0rh3wia+XgQEyzQ0vWTn8x+tE96D+ViGPvRfhLcxVOlvZeSbt/y13WcVdpjp+qHHNEItMgOsUJztdfhYE+HPAXDsPC+k8p/AOyXB/ojMw+jv0rwyYyLUFyKnP29vsvp+v7Du3bjrNoy9XhhQQuy/GzdUfbmI4FRftwGXGIcJ8IwWvJxeY4NBTNDg/p12tUamaQMorKMu1ins8Q7w4KIBQutKb45NRdnHu91S4ruBZ6Ztn/qsMhloVDH+Zfjxusz969qLV2aIxAEvVevp9Hi2d7ZXcSaqNB9tgAYrdX755ntY0tln1CYGwcNC9nHwsaZtvRcWscS9wb/B4oAiPisEpYFGYRhHS2yuSXlsyp2rjJO4GWvtzToDIRL4SZq/y5dJ9SNkaFlQTmtnlMdhBc8H7czNzsdvMb/UhTvcSeGGeFYAovawfUriYSRTrit0JVDcuKbYW5cjQw7dR+HiwTZTaXMA6U7D+E/RA4FHCkTuYX4AMUvxxrvkEhQOf3dOM3oavRuQzpHW5nnY/A7yQKWJFcgw== john@r320
 
 write_files:
   - path: /opt/vnc-setup.sh
