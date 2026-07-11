@@ -338,7 +338,7 @@ def do_create():
         "--boot-disk-managed-disk-source-image-id", IMAGE_ID,
         "--boot-disk-attach-mode", "READ_WRITE",
         "--preemptible-on-preemption", "stop",
-        "--recovery-policy", "recover",
+        "--recovery-policy", "fail",
         "--cloud-init-user-data", cloud_init,
         "--network-interfaces", net_json,
     ]
