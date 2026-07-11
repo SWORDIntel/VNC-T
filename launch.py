@@ -332,6 +332,7 @@ def do_create():
         "--parent-id", PROJECT_ID,
         "--resources-platform", PLATFORM,
         "--resources-preset", PRESET,
+        "--boot-disk-managed-disk-name", f"{VM_NAME}-boot-disk",
         "--boot-disk-managed-disk-size-gibibytes", DISK_SIZE_GIB,
         "--boot-disk-managed-disk-type", DISK_TYPE,
         "--boot-disk-managed-disk-source-image-family-image-family", IMAGE_FAMILY,
@@ -349,14 +350,18 @@ def do_create():
                 console.print(r.stderr[:2000])
             if r.stdout:
                 console.print(r.stdout[:2000])
+            return False
         else:
             console.print("[green]VM created![/green]")
+            return True
     except subprocess.TimeoutExpired:
         console.print("[red]VM creation timed out[/red]")
+        return False
 
 
 def do_create_and_monitor():
-    do_create()
+    if not do_create():
+        sys.exit(1)
     ip = wait_for_ip()
     if not ip:
         sys.exit(1)
