@@ -399,10 +399,11 @@ def train(args):
     if not args.no_tui:
         layout = make_layout(progress, stats, per_class, log_panel)
         live = Live(layout, refresh_per_second=4, console=console)
+        live.start()
+        context = layout
     else:
         live = None
-
-    context = live.__enter__() if live else None
+        context = None
 
     # Training curves for report
     curves = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
@@ -571,7 +572,7 @@ def train(args):
 
         log("All done!")
         if live:
-            live.__exit__(None, None, None)
+            live.stop()
 
         console.print(f"\n[green]Best val acc: {best_val_acc:.2f}% at epoch {best_epoch}[/green]")
         console.print(f"[green]Models saved in: {output_dir}[/green]")
@@ -593,7 +594,7 @@ def train(args):
 
     except Exception as e:
         if live:
-            live.__exit__(None, None, None)
+            live.stop()
         console.print(f"\n[red]Training crashed: {e}[/red]")
         traceback.print_exc()
         # Save emergency checkpoint
