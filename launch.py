@@ -435,6 +435,7 @@ def fetch_vm_state(ip):
     r = ssh_cmd(ip, """
         echo '===STATE==='
         cat /opt/vnc-training-repo/pipeline_state.json 2>/dev/null || echo '{}'
+        echo ''
         echo '===GPU==='
         nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits 2>/dev/null || echo 'none'
         echo '===TMUX==='
@@ -453,8 +454,9 @@ def fetch_vm_state(ip):
     sections = {}
     current = None
     for line in (r.stdout or "").splitlines():
-        if line.startswith("===") and line.endswith("==="):
-            current = line.strip("= ")
+        stripped = line.strip()
+        if stripped.startswith("===") and stripped.endswith("===") and len(stripped) > 6:
+            current = stripped.strip("= ")
             sections[current] = []
         elif current:
             sections[current].append(line)
